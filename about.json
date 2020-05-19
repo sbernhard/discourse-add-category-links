@@ -1,0 +1,6 @@
+{
+  "name": "Add links to category theme component",
+  "about_url": "https://github.com/sbernhard/discourse-add-category-links/blob/master/README.md",
+  "license_url": "https://github.com/sbernhard/discourse-add-category-links/blob/master/LICENSE",
+  "component": true
+}

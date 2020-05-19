@@ -1,0 +1,130 @@
+<script type="text/discourse-plugin" version="0.8.20">
+  const container = Discourse.__container__;
+  const { ajax } = require("discourse/lib/ajax");
+  const PostCooked = require("discourse/widgets/post-cooked").default;
+  const addCategoryLinks = settings.add_category_links;
+
+  if (!addCategoryLinks.length) return;
+
+  const h = require("virtual-dom").h;
+  const postCache = {};
+
+  api.createWidget('add-category-links-widget', {
+    tagName: 'div',
+    html(attrs, state) {
+      const path = window.location.pathname;
+
+      const addLinks = [];
+
+      const controller = container.lookup('controller:navigation/category');
+      const category = controller.get("category");
+
+      if(/^\/c\//.test(path)) {
+        let catDesc = undefined;
+
+        if (category.id in postCache) {
+          const node = postCache[category.id];
+          if (node.attrs.cooked.match("{AddCategoryLinks}") != null) {
+            catDesc = node.attrs.cooked;
+          }
+
+          if (catDesc == undefined) {
+            if(category.parentCategory && settings.fallback_to_parent_category) {
+              if (category.parentCategory.id in postCache) {
+                const node = postCache[category.parentCategory.id];
+                if (node.attrs.cooked.match("{AddCategoryLinks}") != null) {
+                  catDesc = node.attrs.cooked;
+                }
+              } else {
+                this.getPost(category.parentCategory.id, category.parentCategory.topic_url)
+              }
+            }
+          }
+        } else {
+          this.getPost(category.id, category.topic_url)
+        }
+
+        // this will occur on the first attempt since the "real" value is received in the async ajax call
+        if (catDesc == undefined) {
+          return h("");
+        }
+
+        addCategoryLinks.split("|").map(i => {
+          const seg = $.map(i.split(","), $.trim);
+          const catTag = seg[0];
+          const linkTarget = seg[1] === "self" ? "" : "_blank";
+
+          const expression = "{" + catTag + "#([^#}]*)#([^#}]*)#([^#}]*)}"
+          const rx = new RegExp(expression);
+
+          const match = catDesc.match(rx);
+          if (match !== null) {
+            const linkText = match[1];
+            const linkTitle = match[2];
+            const linkHref= match[3];
+
+            if (!linkTarget) {
+              addLinks.push(
+                h(
+                  "li",
+                  {
+                    title: linkTitle,
+                  },
+                  h(
+                    "a",
+                    {
+                      title: linkTitle,
+                      href: linkHref
+                    },
+                    linkText
+                  )
+                )
+              );
+            } else {
+              addLinks.push(
+                h(
+                  "li",
+                  {
+                    title: linkTitle,
+                  },
+                  h(
+                    "a",
+                    {
+                      title: linkTitle,
+                      href: linkHref,
+                      target: linkTarget
+                    },
+                    linkText
+                  )
+                )
+              );
+            }
+          }
+        });
+        return h("ul.nav-pills", addLinks);
+      }
+    },
+
+    getPost(id, url) {
+      ajax(`${url}.json`).then(response => {
+        postCache[id] = new PostCooked({ cooked: response.post_stream.posts[0].cooked });
+        this.scheduleRerender();
+      });
+    }
+  });
+
+  api.decorateWidget('category-add-links-widget:after', helper => {
+      helper.widget.appEvents.on('page:changed', () => {
+          helper.widget.scheduleRerender();
+      });
+  });
+
+</script>
+
+</script>
+<script type="text/x-handlebars"
+  type="text/x-handlebars"
+  data-template-name="/connectors/category-navigation/add-category-links-widget"
+>
+  {{mount-widget widget="add-category-links-widget"}}
+</script>
